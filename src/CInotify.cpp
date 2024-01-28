@@ -7,7 +7,7 @@
 #include <unistd.h>
 
 
-static constexpr int32_t MOVED_FILED_DESCRIPTOR = -1;
+static constexpr int32_t MOVED_FILE_DESCRIPTOR = -1;
 
 std::expected<CInotify, common::ErrorCode> CInotify::make_inotify()
 {
@@ -54,7 +54,7 @@ CInotify::CInotify(CInotify&& other) noexcept
     : m_FileDescriptor{ other.m_FileDescriptor }
     , m_Watches{ std::move(other.m_Watches) }
 {
-    other.m_FileDescriptor = MOVED_FILED_DESCRIPTOR;
+    other.m_FileDescriptor = MOVED_FILE_DESCRIPTOR;
 }
 
 CInotify& CInotify::operator=(CInotify&& other) noexcept
@@ -62,7 +62,7 @@ CInotify& CInotify::operator=(CInotify&& other) noexcept
     if(this != &other)
     {
         m_FileDescriptor = other.m_FileDescriptor;
-        other.m_FileDescriptor = MOVED_FILED_DESCRIPTOR;
+        other.m_FileDescriptor = MOVED_FILE_DESCRIPTOR;
         
         m_Watches = std::move(other.m_Watches);
     }

@@ -1,5 +1,5 @@
 ## Compiler Support
-https://en.cppreference.com/w/cpp/compiler_support/20
+https://en.cppreference.com/w/cpp/compiler_support/23
 
 
 # Build
@@ -13,24 +13,20 @@ https://en.cppreference.com/w/cpp/compiler_support/20
 * cd root
 * mkdir build
 * cd build
-#### Clang
-* -DCMAKE_C_COMPILER=clang-17 -DCMAKE_CXX_COMPILER=clang++-17
-#### GCC
-* -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++
 #### Debug Configuration
-* cmake .. -G Ninja -D CMAKE_BUILD_TYPE=Debug
+* cmake .. -G Ninja -D CMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=*!YOUR-COMPILER!* -DCMAKE_CXX_COMPILER=!YOUR-COMPILER!
 #### ReleaseWithDebugInfo Configuration
-* cmake .. -G Ninja -D CMAKE_BUILD_TYPE=RelWithDebInfo
+* cmake .. -G Ninja -D CMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=*!YOUR-COMPILER!* -DCMAKE_CXX_COMPILER=!YOUR-COMPILER!
 #### MinSizeRelease Configuration
-* cmake .. -G Ninja -D CMAKE_BUILD_TYPE=MinSizeRel
+* cmake .. -G Ninja -D CMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_C_COMPILER=*!YOUR-COMPILER!* -DCMAKE_CXX_COMPILER=!YOUR-COMPILER!
 #### Release Configuration
-* cmake .. -G Ninja -D CMAKE_BUILD_TYPE=Release
+* cmake .. -G Ninja -D CMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=*!YOUR-COMPILER!* -DCMAKE_CXX_COMPILER=!YOUR-COMPILER!
 
 #### Compile and Link
 ninja
 
 ## Removing Cppcheck as build dependency
-Cppcheck can be removed as a custom build target in case it causes troubles (Visual Studio does not like it e.g.). Or in case you just don't want to install it..
+Cppcheck can be removed as a custom build target in case it causes troubles (It doesnt play well with CMake's PCH..).
 * open root/src/CMakeLists.txt
 * Remove line 5 - "add_dependencies(${MAIN_PROJECT} cppcheck)"
 

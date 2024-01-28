@@ -7,7 +7,7 @@
 #include <sys/inotify.h>
 
 
-static constexpr int32_t MOVED_FILED_DESCRIPTOR = -1;
+static constexpr int32_t MOVED_FILE_DESCRIPTOR = -1;
 static constexpr int32_t MOVED_WATCH_DESCRIPTOR = -1;
 
 
@@ -44,7 +44,7 @@ CWatch::CWatch(int32_t fd, std::string path, uint32_t eventMask)
 
 CWatch::~CWatch()
 {
-    if(m_FileDescriptor == MOVED_FILED_DESCRIPTOR)
+    if(m_FileDescriptor == MOVED_FILE_DESCRIPTOR)
         return;
     
     
@@ -63,7 +63,7 @@ CWatch::CWatch(CWatch&& other) noexcept
         , m_WatchDescriptor{ other.m_WatchDescriptor }
         , m_WatchedFile{ std::move(other.m_WatchedFile) }
 {
-    other.m_FileDescriptor = MOVED_FILED_DESCRIPTOR;
+    other.m_FileDescriptor = MOVED_FILE_DESCRIPTOR;
     other.m_WatchDescriptor = MOVED_WATCH_DESCRIPTOR;
 }
 
@@ -72,7 +72,7 @@ CWatch& CWatch::operator=(CWatch&& other) noexcept
     if(this != &other)
     {
         m_FileDescriptor = other.m_FileDescriptor;
-        other.m_FileDescriptor = MOVED_FILED_DESCRIPTOR;
+        other.m_FileDescriptor = MOVED_FILE_DESCRIPTOR;
         m_WatchDescriptor = other.m_WatchDescriptor;
         other.m_WatchDescriptor = MOVED_WATCH_DESCRIPTOR;
         
