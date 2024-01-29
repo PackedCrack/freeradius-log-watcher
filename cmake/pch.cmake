@@ -14,6 +14,7 @@ SET(STD_PCH <cstdint>
         <unordered_set>
         <utility>
         <type_traits>
+        <fstream>
 )
 
 # --- functions --- #

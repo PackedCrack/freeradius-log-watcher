@@ -8,6 +8,8 @@
 #include <sys/inotify.h>
 
 #include <unistd.h>
+#include <thread>
+#include <iostream>
 
 class CInotify
 {
@@ -35,6 +37,20 @@ public:
         inOneshot = IN_ONESHOT,
         inMaskAdd = IN_MASK_ADD
     };
+    struct EventInfo
+    {
+        int32_t wd;
+        EventMask mask;
+        uint32_t cookie;
+        uint32_t len;
+        std::string name;
+    };
+private:
+    enum class State
+    {
+        idle,
+        listening
+    };
 protected:
     CInotify();
 public:
@@ -55,8 +71,8 @@ public:
         std::expected<CWatch, common::ErrorCode> result = CWatch::make_watch(m_FileDescriptor, std::move(path), eventMask);
         if(result)
         {
-            m_Watches.insert(std::move(*result));
-            added = true;
+            auto[iter, emplaced] = m_Watches.try_emplace(std::string{ result.value().watching() }, std::move(*result));
+            added = emplaced;
         }
         else
         {
@@ -68,30 +84,21 @@ public:
         
         return added;
     }
-    
-    inline void test()
-    {
-        const size_t event_size = sizeof(struct inotify_event);
-        const size_t buf_len = 1024 * (event_size + 16);
-        char buffer[buf_len];
-        
-        while (true) {
-            int length = read(m_FileDescriptor, buffer, buf_len);
-            if (length < 0) {
-                LOG_ERROR_FMT("Read error: {}", common::str_error());
-                break;
-            }
-            
-            for (int i = 0; i < length;) {
-                struct inotify_event *event = (struct inotify_event *)&buffer[i];
-                if (event->mask & IN_CREATE) {
-                    std::printf("\nFile created: %s", event->name);
-                }
-                i += event_size + event->len;
-            }
-        }
-    }
+    [[nodiscard]] bool start_listening();
+    [[nodiscard]] bool stop_listening();
+private:
+    auto listen();
 private:
     int32_t m_FileDescriptor;
-    std::unordered_set<CWatch, CWatch::Hasher> m_Watches;
+    State m_CurrentState;
+    std::filesystem::path m_ExitState;
+    std::thread m_ListeningThread;
+    std::function<void(const EventInfo& info)> m_EventHandler;
+    std::unordered_map<std::string, CWatch> m_Watches;
 };
+
+
+inline size_t operator&(CInotify::EventMask lhs, CInotify::EventMask rhs)
+{
+    return std::to_underlying(lhs) & std::to_underlying(rhs);
+}

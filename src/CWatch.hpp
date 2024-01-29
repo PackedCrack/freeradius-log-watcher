@@ -29,5 +29,6 @@ public:
 private:
     int32_t m_FileDescriptor;
     int32_t m_WatchDescriptor;
+    uint32_t m_EventMask;
     std::string m_WatchedFile;
 };

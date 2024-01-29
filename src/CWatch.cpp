@@ -31,6 +31,7 @@ std::expected<CWatch, common::ErrorCode> CWatch::make_watch(int32_t fd, std::str
 CWatch::CWatch(int32_t fd, std::string path, uint32_t eventMask)
     : m_FileDescriptor{ fd }
     , m_WatchDescriptor{ inotify_add_watch(m_FileDescriptor, path.c_str(), eventMask) }
+    , m_EventMask{ eventMask }
     , m_WatchedFile{ std::move(path) }
 {
     if(m_WatchDescriptor < 0)
@@ -44,9 +45,12 @@ CWatch::CWatch(int32_t fd, std::string path, uint32_t eventMask)
 
 CWatch::~CWatch()
 {
-    if(m_FileDescriptor == MOVED_FILE_DESCRIPTOR)
+    if(m_FileDescriptor < 0)
         return;
     
+    // Inotify apperantly handles deletion of SOME events.......
+    if(m_EventMask & IN_MOVE_SELF || m_EventMask & IN_DELETE_SELF)
+        return;
     
     int32_t result = inotify_rm_watch(m_FileDescriptor, m_WatchDescriptor);
     if(result < 0)
@@ -61,6 +65,7 @@ CWatch::~CWatch()
 CWatch::CWatch(CWatch&& other) noexcept
         : m_FileDescriptor{ other.m_FileDescriptor }
         , m_WatchDescriptor{ other.m_WatchDescriptor }
+        , m_EventMask{ other.m_EventMask }
         , m_WatchedFile{ std::move(other.m_WatchedFile) }
 {
     other.m_FileDescriptor = MOVED_FILE_DESCRIPTOR;
@@ -75,6 +80,7 @@ CWatch& CWatch::operator=(CWatch&& other) noexcept
         other.m_FileDescriptor = MOVED_FILE_DESCRIPTOR;
         m_WatchDescriptor = other.m_WatchDescriptor;
         other.m_WatchDescriptor = MOVED_WATCH_DESCRIPTOR;
+        m_EventMask = other.m_EventMask;
         
         m_WatchedFile = std::move(other.m_WatchedFile);
     }

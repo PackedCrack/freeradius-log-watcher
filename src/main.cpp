@@ -61,10 +61,32 @@ int main(int argc, char** argv)
         std::expected<CInotify, common::ErrorCode> result = CInotify::make_inotify();
         if(result)
         {
-            result.value().try_add_watch("/home/hackerman/Desktop/test2/", CInotify::EventMask::inCreate);
+            [[maybe_unused]] bool added = result.value().try_add_watch("/home/hackerman/Desktop/test2/", CInotify::EventMask::inCreate);
+            
+            
+            if(!result.value().start_listening())
+            {
+                LOG_WARN("Failed to start listening..");
+                return EXIT_FAILURE;
+            }
             
             LOG_INFO("Listeing for events..");
-            result.value().test();
+            while(true)
+            {
+                std::string inp{};
+                std::cin >> inp;
+                if(inp == "exit")
+                {
+                    if(!result.value().stop_listening())
+                    {
+                        return EXIT_FAILURE;
+                    }
+                    else
+                    {
+                        return EXIT_SUCCESS;
+                    }
+                }
+            }
         }
         
         
