@@ -3,8 +3,6 @@
 //
 #include "CInotify.hpp"
 #include "defines.hpp"
-// linux
-#include <unistd.h>
 
 
 
@@ -60,11 +58,11 @@ CInotify::EventInfo make_event_info(const std::array<char, LISTEN_BUFFER_SIZE>& 
 }   // namespace
 
 
-std::expected<CInotify, common::ErrorCode> CInotify::make_inotify()
+std::expected<CInotify, common::ErrorCode> CInotify::make_inotify(std::function<void(const EventInfo& info)> eventHandler)
 {
     try
     {
-        return CInotify{};
+        return CInotify{ std::move(eventHandler) };
     }
     catch(const std::runtime_error& err)
     {
@@ -91,10 +89,18 @@ void CInotify::move_thread(CInotify& other)
 {
     if(other.m_CurrentState == State::listening)
     {
-        other.stop_listening();
+        if(!other.stop_listening())
+        {
+            LOG_ERROR_FMT(
+                    "Failed to stop the listening thread when moving CInotify with File Descriptor: {}", other.m_FileDescriptor);
+        }
         
         m_Watches.erase(other.m_ExitState);
-        start_listening();
+        if(!start_listening())
+        {
+            LOG_ERROR_FMT(
+                    "Failed to start the listening thread on the moved to CInotify with File Descriptor: {}", m_FileDescriptor);
+        }
     }
 }
 
@@ -102,12 +108,11 @@ CInotify CInotify::copy(const CInotify& other) const
 {
     LOG_WARN("Called copy on CInotify.. Is this really what you want?");
     
-    std::expected<CInotify, common::ErrorCode> result = make_inotify();
+    std::expected<CInotify, common::ErrorCode> result = make_inotify(other.m_EventHandler);
     if(!result)
         throw std::runtime_error{ std::format("Failed making a copy of CInotify with file descriptor: {}", m_FileDescriptor) };
     
     CInotify cpy = std::move(result.value());
-    cpy.m_EventHandler = other.m_EventHandler;
     for(const auto& pair : other.m_Watches)
     {
         const CWatch& watch = pair.second;
@@ -124,12 +129,12 @@ CInotify CInotify::copy(const CInotify& other) const
     return cpy;
 }
 
-CInotify::CInotify()
+CInotify::CInotify(std::function<void(const EventInfo& info)>&& eventHandler)
     : m_FileDescriptor{ inotify_init() }
     , m_CurrentState{ State::idle }
     , m_ExitState{ create_tmp_filepath() }
     , m_ListeningThread{}
-    , m_EventHandler{[](const EventInfo& info){}}
+    , m_EventHandler{ eventHandler }
     , m_Watches{}
 {
     if(m_FileDescriptor < 0)

@@ -4,10 +4,7 @@
 
 #pragma once
 #include "CWatch.hpp"
-// linux
-#include <sys/inotify.h>
 
-#include <unistd.h>
 
 class CInotify final
 {
@@ -27,9 +24,10 @@ private:
         listening
     };
 private:
-    CInotify();
+    explicit CInotify(std::function<void(const EventInfo& info)>&& eventHandler);
 public:
-    [[nodiscard]] static std::expected<CInotify, common::ErrorCode> make_inotify();
+    [[nodiscard]] static std::expected<CInotify, common::ErrorCode> make_inotify(
+            std::function<void(const EventInfo& info)> eventHandler);
     ~CInotify();
     CInotify(const CInotify& other);
     CInotify(CInotify&& other) noexcept;

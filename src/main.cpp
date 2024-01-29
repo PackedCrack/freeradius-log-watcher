@@ -58,7 +58,7 @@ int main(int argc, char** argv)
             std::printf("%s", e.c_str());
         
         
-        std::expected<CInotify, common::ErrorCode> result = CInotify::make_inotify();
+        std::expected<CInotify, common::ErrorCode> result = CInotify::make_inotify([](const CInotify::EventInfo& info){});
         if(result)
         {
             [[maybe_unused]] bool added = result.value().try_add_watch("/home/hackerman/Desktop/test2/", CWatch::EventMask::inCreate);
