@@ -73,9 +73,55 @@ std::expected<CInotify, common::ErrorCode> CInotify::make_inotify()
     }
 }
 
-CInotify CInotify::copy() const
+void CInotify::copy_thread(const CInotify& other)
 {
+    if(other.m_CurrentState == State::listening)
+    {
+        if(!start_listening())
+        {
+            LOG_ERROR_FMT(
+                    "Failed to start listening thread for inotify file descriptor: {}. Copy of inotify file descriptor: {}",
+                    m_FileDescriptor,
+                    other.m_FileDescriptor);
+        }
+    }
+}
 
+void CInotify::move_thread(CInotify& other)
+{
+    if(other.m_CurrentState == State::listening)
+    {
+        other.stop_listening();
+        
+        m_Watches.erase(other.m_ExitState);
+        start_listening();
+    }
+}
+
+CInotify CInotify::copy(const CInotify& other) const
+{
+    LOG_WARN("Called copy on CInotify.. Is this really what you want?");
+    
+    std::expected<CInotify, common::ErrorCode> result = make_inotify();
+    if(!result)
+        throw std::runtime_error{ std::format("Failed making a copy of CInotify with file descriptor: {}", m_FileDescriptor) };
+    
+    CInotify cpy = std::move(result.value());
+    cpy.m_EventHandler = other.m_EventHandler;
+    for(const auto& pair : other.m_Watches)
+    {
+        const CWatch& watch = pair.second;
+        if(watch.watching() != other.m_ExitState)
+        {
+            if(!cpy.try_add_watch(std::string{ watch.watching() }, watch.event_mask()))
+            {
+                LOG_ERROR_FMT("Failed to copy watch: {}", watch.watching());
+            }
+        }
+    }
+    
+    
+    return cpy;
 }
 
 CInotify::CInotify()
@@ -121,15 +167,41 @@ CInotify::~CInotify()
     }
 }
 
+CInotify::CInotify(const CInotify& other)
+        : m_FileDescriptor{}
+        , m_CurrentState{ }
+        , m_ExitState{ }
+        , m_ListeningThread{}
+        , m_EventHandler{[](const EventInfo& info){}}
+        , m_Watches{}
+{
+    *this = copy(other);
+    copy_thread(other);
+}
+
 CInotify::CInotify(CInotify&& other) noexcept
     : m_FileDescriptor{ other.m_FileDescriptor }
-    , m_CurrentState{ other.m_CurrentState }
-    , m_ExitState{ std::move(other.m_ExitState) }
-    , m_ListeningThread{ std::move(other.m_ListeningThread) }
+    , m_CurrentState{ State::idle }
+    , m_ExitState{}
+    , m_ListeningThread{}
     , m_EventHandler{ std::move(other.m_EventHandler) }
     , m_Watches{ std::move(other.m_Watches) }
 {
     other.m_FileDescriptor = MOVED_FILE_DESCRIPTOR;
+    
+    m_ExitState = other.m_ExitState; // intentional copy
+    move_thread(other);
+}
+
+CInotify& CInotify::operator=(const CInotify& other)
+{
+    if(this != &other)
+    {
+        *this = copy(other);
+        copy_thread(other);
+    }
+    
+    return *this;
 }
 
 CInotify& CInotify::operator=(CInotify&& other) noexcept
@@ -139,11 +211,11 @@ CInotify& CInotify::operator=(CInotify&& other) noexcept
         m_FileDescriptor = other.m_FileDescriptor;
         other.m_FileDescriptor = MOVED_FILE_DESCRIPTOR;
         
-        m_CurrentState = other.m_CurrentState;
-        m_ExitState = std::move(other.m_ExitState);
-        m_ListeningThread = std::move(other.m_ListeningThread);
+        m_CurrentState = State::idle;
+        m_ExitState = other.m_ExitState; // intentional copy
         m_EventHandler = std::move(other.m_EventHandler);
         m_Watches = std::move(other.m_Watches);
+        move_thread(other);
     }
     
     return *this;
@@ -153,6 +225,8 @@ auto CInotify::listen()
 {
     return [this]()
     {
+        ASSERT(m_EventHandler, "Event handler is missing..");
+        
         std::array<char, LISTEN_BUFFER_SIZE> buffer{ 0 };
         bool listening = true;
         while(listening)
@@ -170,7 +244,7 @@ auto CInotify::listen()
                     i = i + static_cast<ssize_t>(EVENT_SIZE) + event.len;
                     
                     
-                    if(event.mask & EventMask::inDeleteSelf || event.mask & EventMask::inMoveSelf)
+                    if(event.mask & CWatch::EventMask::inDeleteSelf || event.mask & CWatch::EventMask::inMoveSelf)
                     {
                         if(static_cast<std::string>(m_ExitState).contains(event.name))
                         {
@@ -181,8 +255,8 @@ auto CInotify::listen()
                         m_Watches.erase(event.name);
                     }
                     
-                    ASSERT(m_EventHandler, "Event handler is missing..");
-                    m_EventHandler(event);
+                    if(m_EventHandler)
+                        m_EventHandler(event);
                 }
             }
         }
@@ -203,7 +277,7 @@ bool CInotify::start_listening()
     file << "exit:0";
     
     // add watch
-    bool watchAdded = try_add_watch(m_ExitState, EventMask::inDeleteSelf);
+    bool watchAdded = try_add_watch(m_ExitState, CWatch::EventMask::inDeleteSelf);
     if(!watchAdded)
     {
         LOG_ERROR_FMT("Failed to create a watch for tmp file: {}", m_ExitState.c_str());

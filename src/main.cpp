@@ -26,7 +26,7 @@ void process_cmd_line_args(int argc, char** argv)
 }   // namespace
 
 #include "CInotify.hpp"
-
+#include <iostream>
 
 int main(int argc, char** argv)
 {
@@ -61,7 +61,7 @@ int main(int argc, char** argv)
         std::expected<CInotify, common::ErrorCode> result = CInotify::make_inotify();
         if(result)
         {
-            [[maybe_unused]] bool added = result.value().try_add_watch("/home/hackerman/Desktop/test2/", CInotify::EventMask::inCreate);
+            [[maybe_unused]] bool added = result.value().try_add_watch("/home/hackerman/Desktop/test2/", CWatch::EventMask::inCreate);
             
             
             if(!result.value().start_listening())
@@ -70,6 +70,14 @@ int main(int argc, char** argv)
                 return EXIT_FAILURE;
             }
             
+            CInotify testcpy = result.value();
+            CInotify testcpy2{ testcpy };
+            CInotify testcpy4{ testcpy };
+            
+            CInotify testcpy3{ std::move(result.value()) };
+            CInotify testcpy5 = std::move(testcpy4);
+            
+            
             LOG_INFO("Listeing for events..");
             while(true)
             {
@@ -77,14 +85,21 @@ int main(int argc, char** argv)
                 std::cin >> inp;
                 if(inp == "exit")
                 {
-                    if(!result.value().stop_listening())
+                    if(testcpy3.stop_listening())
                     {
-                        return EXIT_FAILURE;
+                        if(testcpy2.stop_listening())
+                        {
+                            if(testcpy5.stop_listening())
+                            {
+                                if(testcpy.stop_listening())
+                                {
+                                    return EXIT_SUCCESS;
+                                }
+                            }
+                        }
                     }
-                    else
-                    {
-                        return EXIT_SUCCESS;
-                    }
+                    
+                    return EXIT_FAILURE;
                 }
             }
         }

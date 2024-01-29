@@ -3,8 +3,7 @@
 //
 #include "CWatch.hpp"
 #include "defines.hpp"
-// linux
-#include <sys/inotify.h>
+
 
 
 static constexpr int32_t MOVED_FILE_DESCRIPTOR = -1;
@@ -16,7 +15,7 @@ size_t CWatch::Hasher::operator()(const CWatch& owner) const
     return std::hash<std::string>{}( owner.m_WatchedFile );
 }
 
-std::expected<CWatch, common::ErrorCode> CWatch::make_watch(int32_t fd, std::string path, uint32_t eventMask)
+std::expected<CWatch, common::ErrorCode> CWatch::make_watch(int32_t fd, std::string path, EventMask eventMask)
 {
     try
     {
@@ -28,9 +27,9 @@ std::expected<CWatch, common::ErrorCode> CWatch::make_watch(int32_t fd, std::str
     }
 }
 
-CWatch::CWatch(int32_t fd, std::string path, uint32_t eventMask)
+CWatch::CWatch(int32_t fd, std::string path, EventMask eventMask)
     : m_FileDescriptor{ fd }
-    , m_WatchDescriptor{ inotify_add_watch(m_FileDescriptor, path.c_str(), eventMask) }
+    , m_WatchDescriptor{ inotify_add_watch(m_FileDescriptor, path.c_str(), std::to_underlying(eventMask)) }
     , m_EventMask{ eventMask }
     , m_WatchedFile{ std::move(path) }
 {
@@ -49,7 +48,7 @@ CWatch::~CWatch()
         return;
     
     // Inotify apperantly handles deletion of SOME events.......
-    if(m_EventMask & IN_MOVE_SELF || m_EventMask & IN_DELETE_SELF)
+    if(m_EventMask & EventMask::inMoveSelf || m_EventMask & EventMask::inDeleteSelf)
         return;
     
     int32_t result = inotify_rm_watch(m_FileDescriptor, m_WatchDescriptor);
@@ -109,4 +108,9 @@ bool operator==(const CWatch& lhs, const CWatch& rhs)
 std::string_view CWatch::watching() const
 {
     return m_WatchedFile;
+}
+
+CWatch::EventMask CWatch::event_mask() const
+{
+    return m_EventMask;
 }

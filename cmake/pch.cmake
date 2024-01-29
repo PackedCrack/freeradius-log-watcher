@@ -15,6 +15,7 @@ SET(STD_PCH <cstdint>
         <utility>
         <type_traits>
         <fstream>
+        <thread>
 )
 
 # --- functions --- #
