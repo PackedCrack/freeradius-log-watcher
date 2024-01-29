@@ -50,7 +50,7 @@ public:
     CWatch& operator=(CWatch&& other) noexcept;
 public:
     friend bool operator==(const CWatch& lhs, const CWatch& rhs);
-    [[nodiscard]] size_t operator()(const CWatch& self) const;
+    [[nodiscard]] size_t operator()() const;
     [[nodiscard]] std::string_view watching() const;
     [[nodiscard]] EventMask event_mask() const;
 private:

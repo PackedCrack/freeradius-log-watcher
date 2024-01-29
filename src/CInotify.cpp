@@ -177,7 +177,7 @@ CInotify::CInotify(const CInotify& other)
         , m_CurrentState{ }
         , m_ExitState{ }
         , m_ListeningThread{}
-        , m_EventHandler{[](const EventInfo& info){}}
+        , m_EventHandler{}
         , m_Watches{}
 {
     *this = copy(other);

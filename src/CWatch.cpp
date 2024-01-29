@@ -87,7 +87,7 @@ CWatch& CWatch::operator=(CWatch&& other) noexcept
     return *this;
 }
 
-size_t CWatch::operator()(const CWatch& self) const
+size_t CWatch::operator()() const
 {
     return Hasher{}(*this);
 }
