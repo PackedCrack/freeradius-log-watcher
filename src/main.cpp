@@ -3,22 +3,27 @@
 
 namespace
 {
-void process_cmd_line_args(int argc, char** argv)
-{
-    if (argc < 1)
-        LOG_FATAL_FMT("Not enough command line arguments given, expected at least 1.", argc);
+constexpr std::string_view KEY_RADACCT = "radacct";
 
-    std::vector<std::string> arguments{};
-    arguments.reserve(static_cast<std::size_t>(argc));
+
+void process_cmd_line_args(int argc, char** argv, std::unordered_map<std::string_view, std::string>& argCache)
+{
     for (int32_t i = 0; i < argc; ++i)
     {
-        arguments.emplace_back(argv[i]);
-    }
-
-
-    for (std::string_view arg : arguments)
-    {
-        // TODO
+        std::string_view arg = argv[i];
+        if(arg == "-radacct")
+        {
+            i = i + 1;
+            auto[iter, emplaced] = argCache.try_emplace(KEY_RADACCT, std::string{ argv[i] });
+            if(emplaced)
+            {
+                LOG_INFO_FMT("Using custom filepath to radacct directory: {}", iter->second);
+            }
+            else
+            {
+                LOG_WARN("Failed to add custom radacct directory to the argument cache..");
+            }
+        }
     }
 }
 
@@ -34,12 +39,33 @@ int main(int argc, char** argv)
 
     try
     {
-        process_cmd_line_args(argc, argv);
+        std::unordered_map<std::string_view, std::string> argCache{};
+        process_cmd_line_args(argc, argv, argCache);
+        
+        std::filesystem::path logDirectory{};
+        if(argCache.contains(KEY_RADACCT))
+            logDirectory = argCache.find(KEY_RADACCT)->second;
+        else
+            logDirectory = "/var/log/freeradius/radacct";
+        
+        
+        
+        
+        std::expected<CInotify, common::ErrorCode> result = CInotify::make_inotify(
+                [](const CInotify::EventInfo& info){ LOG_WARN("TODO: Implemenet event handling"); });
+        if(!result)
+        {
+            LOG_FATAL_FMT("FATAL: Failed to create Inotify. Failed with error code: {} - {}",
+                          std::to_underlying(result.error()),
+                          common::error_code_to_str(result.error()));
+        }
+        CInotify fileSystemMonitor = std::move(*result);
+        
+        
         
         
         std::vector<std::filesystem::path> nas{};
         
-        std::filesystem::path logDirectory = "/var/log/freeradius/radacct";
         for(const auto& entry : std::filesystem::directory_iterator(logDirectory))
         {
             std::error_code err{};
@@ -58,55 +84,24 @@ int main(int argc, char** argv)
             std::printf("%s", e.c_str());
         
         
-        std::expected<CInotify, common::ErrorCode> result = CInotify::make_inotify([](const CInotify::EventInfo& info){});
-        if(result)
+        std::expected<CInotify, common::ErrorCode> result2 = CInotify::make_inotify([](const CInotify::EventInfo& info){});
+        if(result2)
         {
-            [[maybe_unused]] bool added = result.value().try_add_watch("/home/hackerman/Desktop/test2/", CWatch::EventMask::inCreate);
+            [[maybe_unused]] bool added = result2.value().try_add_watch("/home/hackerman/Desktop/test2/", CWatch::EventMask::inCreate);
             
             
-            if(!result.value().start_listening())
+            if(!result2.value().start_listening())
             {
                 LOG_WARN("Failed to start listening..");
                 return EXIT_FAILURE;
             }
             
-            CInotify testcpy = result.value();
-            CInotify testcpy2{ testcpy };
-            CInotify testcpy4{ testcpy };
             
-            CInotify testcpy3{ std::move(result.value()) };
-            CInotify testcpy5 = std::move(testcpy4);
-            
-            
-            LOG_INFO("Listeing for events..");
-            while(true)
-            {
-                std::string inp{};
-                std::cin >> inp;
-                if(inp == "exit")
-                {
-                    if(testcpy3.stop_listening())
-                    {
-                        if(testcpy2.stop_listening())
-                        {
-                            if(testcpy5.stop_listening())
-                            {
-                                if(testcpy.stop_listening())
-                                {
-                                    return EXIT_SUCCESS;
-                                }
-                            }
-                        }
-                    }
-                    
-                    return EXIT_FAILURE;
-                }
-            }
         }
         
         
         
-        return 0;
+        return EXIT_SUCCESS;
         
         bool exit = false;
         while (!exit)
