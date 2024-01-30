@@ -89,15 +89,54 @@ void process_cmd_line_args(int argc, char** argv, std::unordered_map<std::string
     return fsmonitor;
 }
 
+[[nodiscard]] std::string previous_date(uint32_t daysToSubtract)
+{
+    std::chrono::sys_days date = std::chrono::year_month_day{ floor<std::chrono::days>(std::chrono::system_clock::now()) };
+    if(daysToSubtract > 0u)
+        date -= std::chrono::days{ daysToSubtract };
+    
+    
+    std::string dateAsStr = std::format("{}", date);
+    std::erase_if(dateAsStr, [](char c){ return c == '-'; });
+    
+    return dateAsStr;
+}
 
+[[nodiscard]] std::string todays_date()
+{
+    return previous_date(0u);
+}
 
-void watch_ap_logs(CInotify& fileSystemMonitor, const std::filesystem::path& apDirectory)
+void watch_log_file(CInotify& fileSystemMonitor, const std::filesystem::path& apDirectory)
 {
     ASSERT(std::filesystem::is_directory(apDirectory), "The filepath to the access points log directory must be a directory!");
     
+    std::string todaysDate = todays_date();
     for(const auto& entry : std::filesystem::directory_iterator(apDirectory))
     {
-    
+        std::error_code err{};
+        if(std::filesystem::is_regular_file(entry.path(), err))
+        {
+            if(std::string_view{ entry.path().c_str() }.contains(todaysDate))
+            {
+                if(fileSystemMonitor.try_add_watch(entry.path(), CWatch::EventMask::inModify))
+                {
+                    LOG_INFO_FMT("Watching file: {}, for modifications..", entry.path().c_str());
+                    break;
+                }
+                else
+                {
+                    LOG_ERROR_FMT("Failed to create watch for entry: {}, when looking for the latest log file",
+                                  entry.path().c_str());
+                }
+            }
+        }
+        else if(err)
+        {
+            LOG_ERROR_FMT("Failed to determine if entry: {} is is a file. Error message: {}",
+                          entry.path().c_str(),
+                          err.message());
+        }
     }
 }
 
@@ -108,16 +147,16 @@ void watch_ap_directories(CInotify& fileSystemMonitor, const std::filesystem::pa
         std::error_code err{};
         if(entry.is_directory(err))
         {
-            if(!fileSystemMonitor.try_add_watch(entry.path(), CWatch::EventMask::inCreate))
+            if(fileSystemMonitor.try_add_watch(entry.path(), CWatch::EventMask::inCreate))
+            {
+                LOG_INFO_FMT("Watching directory: {}, for file creations..", entry.path().c_str());
+                watch_log_file(fileSystemMonitor, entry.path());
+            }
+            else
             {
                 LOG_ERROR_FMT("Failed to create watch for entry: {}, when iterating log directory: {}",
                               entry.path().c_str(),
                               logDirectory.c_str());
-            }
-            else
-            {
-                LOG_INFO_FMT("Created watch for entry: {}", entry.path().c_str());
-                watch_ap_logs(fileSystemMonitor, entry.path());
             }
         }
         else if(err)
@@ -148,26 +187,11 @@ int main(int argc, char** argv)
         watch_ap_directories(fileSystemMonitor, logDirectory);
         
         
-        std::vector<std::filesystem::path> nas{};
-        
-        for(const auto& entry : std::filesystem::directory_iterator(logDirectory))
-        {
-            std::error_code err{};
-            bool wasDir = entry.is_directory(err);
-            if(err)
-            {
-                LOG_ERROR_FMT("Failed to iterate contents of the log directory. Failed with: {}", err.value());
-            }
-            else if(wasDir)
-            {
-                nas.push_back(entry);
-            }
-        }
-        
-        for(auto e : nas)
-            std::printf("%s", e.c_str());
         
         
+        
+        
+        /// TEST CODE
         std::expected<CInotify, common::ErrorCode> result2 = CInotify::make_inotify([](const CInotify::EventInfo& info){});
         if(result2)
         {
