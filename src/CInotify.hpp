@@ -46,7 +46,7 @@ public:
             auto[iter, emplaced] = m_Watches.try_emplace(std::string{ result.value().watching() }, std::move(*result));
             if(!emplaced)
             {
-                LOG_ERROR_FMT("Failed to emplaced newly created watch for file: {}", result.value().watching());
+                LOG_ERROR_FMT("Failed to emplace newly created watch for file: {}", result.value().watching());
             }
             added = emplaced;
         }
