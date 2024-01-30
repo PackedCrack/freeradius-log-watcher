@@ -85,7 +85,7 @@ void CInotify::copy_thread(const CInotify& other)
     }
 }
 
-void CInotify::move_thread(CInotify& other)
+bool CInotify::move_thread(CInotify& other)
 {
     if(other.m_CurrentState == State::listening)
     {
@@ -94,14 +94,19 @@ void CInotify::move_thread(CInotify& other)
             LOG_ERROR_FMT(
                     "Failed to stop the listening thread when moving CInotify with File Descriptor: {}", other.m_FileDescriptor);
         }
-        
         m_Watches.erase(other.m_ExitState);
+        
+        m_ExitState = std::move(other.m_ExitState);
         if(!start_listening())
         {
             LOG_ERROR_FMT(
                     "Failed to start the listening thread on the moved to CInotify with File Descriptor: {}", m_FileDescriptor);
         }
+        
+        return true;
     }
+    
+    return false;
 }
 
 CInotify CInotify::copy(const CInotify& other) const
@@ -194,8 +199,8 @@ CInotify::CInotify(CInotify&& other) noexcept
 {
     other.m_FileDescriptor = MOVED_FILE_DESCRIPTOR;
     
-    m_ExitState = other.m_ExitState; // intentional copy
-    move_thread(other);
+    if(!move_thread(other))
+        m_ExitState = std::move(other.m_ExitState);
 }
 
 CInotify& CInotify::operator=(const CInotify& other)
@@ -217,10 +222,10 @@ CInotify& CInotify::operator=(CInotify&& other) noexcept
         other.m_FileDescriptor = MOVED_FILE_DESCRIPTOR;
         
         m_CurrentState = State::idle;
-        m_ExitState = other.m_ExitState; // intentional copy
         m_EventHandler = std::move(other.m_EventHandler);
         m_Watches = std::move(other.m_Watches);
-        move_thread(other);
+        if(!move_thread(other))
+            m_ExitState = std::move(other.m_ExitState);
     }
     
     return *this;

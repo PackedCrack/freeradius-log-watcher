@@ -63,8 +63,8 @@ public:
     [[nodiscard]] bool start_listening();
     [[nodiscard]] bool stop_listening();
 private:
-    void move_thread(CInotify& other);
     void copy_thread(const CInotify& other);
+    [[nodiscard]] bool move_thread(CInotify& other);
     [[nodiscard]] CInotify copy(const CInotify& other) const;
     [[nodiscard]] auto listen();
 private:
