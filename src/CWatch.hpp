@@ -53,6 +53,7 @@ public:
     [[nodiscard]] size_t operator()() const;
     [[nodiscard]] std::string_view watching() const;
     [[nodiscard]] EventMask event_mask() const;
+    [[nodiscard]] int32_t descriptor() const;
 private:
     int32_t m_FileDescriptor;
     int32_t m_WatchDescriptor;

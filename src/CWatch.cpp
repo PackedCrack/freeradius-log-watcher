@@ -114,3 +114,8 @@ CWatch::EventMask CWatch::event_mask() const
 {
     return m_EventMask;
 }
+
+int32_t CWatch::descriptor() const
+{
+    return m_WatchDescriptor;
+}

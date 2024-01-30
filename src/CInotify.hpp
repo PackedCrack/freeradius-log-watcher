@@ -24,10 +24,10 @@ private:
         listening
     };
 private:
-    explicit CInotify(std::function<void(const EventInfo& info)>&& eventHandler);
+    explicit CInotify(std::function<void(CInotify& self, const EventInfo& info)>&& eventHandler);
 public:
     [[nodiscard]] static std::expected<CInotify, common::ErrorCode> make_inotify(
-            std::function<void(const EventInfo& info)> eventHandler);
+            std::function<void(CInotify& self, const EventInfo& info)> eventHandler);
     ~CInotify();
     CInotify(const CInotify& other);
     CInotify(CInotify&& other) noexcept;
@@ -60,8 +60,12 @@ public:
         
         return added;
     }
+    [[nodiscard]] std::optional<const CWatch*> find_watch(int32_t watchDescriptor) const;
+    [[nodiscard]] std::optional<std::filesystem::path> watched_filepath(int32_t watchDescriptor) const;
+    [[nodiscard]] bool erase_watch(const std::filesystem::path& path);
     [[nodiscard]] bool start_listening();
     [[nodiscard]] bool stop_listening();
+    [[nodiscard]] bool has_watch(const std::filesystem::path& path);
 private:
     void copy_thread(const CInotify& other);
     [[nodiscard]] bool move_thread(CInotify& other);
@@ -72,7 +76,7 @@ private:
     State m_CurrentState;
     std::filesystem::path m_ExitState;
     std::thread m_ListeningThread;
-    std::function<void(const EventInfo& info)> m_EventHandler;
+    std::function<void(CInotify& self, const EventInfo& info)> m_EventHandler;
     std::unordered_map<std::string, CWatch> m_Watches;
 };
 

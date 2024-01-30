@@ -41,6 +41,11 @@ CInotify::EventInfo make_event_info(const std::array<char, LISTEN_BUFFER_SIZE>& 
     IGNORE_WARNING(std::memcpy(&event, &buffer[offset], EVENT_SIZE), "-Wclass-memaccess");
     event.name = std::string{ &buffer[offset + EVENT_SIZE], event.len };
     
+    // Remove any potential null terminators that the constructor may have put in the string content - it screws up logging
+    while(event.name.ends_with(static_cast<char>(0)))
+        event.name.pop_back();
+    
+    
     return event;
 }
 
@@ -58,7 +63,8 @@ CInotify::EventInfo make_event_info(const std::array<char, LISTEN_BUFFER_SIZE>& 
 }   // namespace
 
 
-std::expected<CInotify, common::ErrorCode> CInotify::make_inotify(std::function<void(const EventInfo& info)> eventHandler)
+std::expected<CInotify, common::ErrorCode> CInotify::make_inotify(
+        std::function<void(CInotify& self, const EventInfo& info)> eventHandler)
 {
     try
     {
@@ -134,7 +140,7 @@ CInotify CInotify::copy(const CInotify& other) const
     return cpy;
 }
 
-CInotify::CInotify(std::function<void(const EventInfo& info)>&& eventHandler)
+CInotify::CInotify(std::function<void(CInotify& self, const EventInfo& info)>&& eventHandler)
     : m_FileDescriptor{ inotify_init() }
     , m_CurrentState{ State::idle }
     , m_ExitState{ create_tmp_filepath() }
@@ -266,11 +272,38 @@ auto CInotify::listen()
                     }
                     
                     if(m_EventHandler)
-                        m_EventHandler(event);
+                        m_EventHandler(*this, event);
                 }
             }
         }
     };
+}
+
+std::optional<const CWatch*> CInotify::find_watch(int32_t watchDescriptor) const
+{
+    auto iter = std::find_if(std::begin(m_Watches), std::end(m_Watches),
+                 [watchDescriptor](const auto& pair)
+                 {
+                     const CWatch& watch = pair.second;
+                     return watch.descriptor() == watchDescriptor;
+                 });
+    
+    return iter != std::end(m_Watches) ? std::make_optional(&(iter->second)) : std::nullopt;
+}
+
+std::optional<std::filesystem::path> CInotify::watched_filepath(int32_t watchDescriptor) const
+{
+    const CWatch* pWatch = find_watch(watchDescriptor).value_or(nullptr);
+    return pWatch != nullptr ? std::make_optional(std::filesystem::path{ pWatch->watching() }) : std::nullopt;
+}
+
+bool CInotify::erase_watch(const std::filesystem::path& path)
+{
+    bool erased = false;
+    if(m_Watches.erase(path) > 0)
+        erased = true;
+    
+    return erased;
 }
 
 bool CInotify::start_listening()
@@ -344,4 +377,9 @@ bool CInotify::stop_listening()
     
     
     return true;
+}
+
+bool CInotify::has_watch(const std::filesystem::path& path)
+{
+    return m_Watches.contains(path);
 }
