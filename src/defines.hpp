@@ -21,6 +21,10 @@ _Pragma(TOSTRING(COMPILER_NAME diagnostic ignored warning))                     
 expr;                                                                                   \
 _Pragma(TOSTRING(COMPILER_NAME diagnostic pop))
 
+#define DISABLE_WARNING(warning) _Pragma(TOSTRING(COMPILER_NAME diagnostic push)) \
+    _Pragma(TOSTRING(COMPILER_NAME diagnostic ignored warning))
+#define ENABLE_WARNING() _Pragma(TOSTRING(COMPILER_NAME diagnostic pop))
+
 #ifndef NDEBUG
 #define ASSERT(expr, msg) \
 	if(expr) \

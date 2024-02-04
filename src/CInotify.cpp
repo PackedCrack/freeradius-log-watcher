@@ -311,7 +311,7 @@ bool CInotify::start_listening()
     ASSERT(m_CurrentState == State::idle, "This notify is already listening to events!");
     
     // Write working file
-    std::fstream file{ m_ExitState, std::ios::binary | std::ios::out | std::ios::trunc };
+    std::fstream file{ common::trim_trailing_seperator(m_ExitState), std::ios::binary | std::ios::out | std::ios::trunc };
     if(!file.is_open())
     {
         LOG_ERROR_FMT("Failed to create tmp file required for listening: {}", m_ExitState.c_str());

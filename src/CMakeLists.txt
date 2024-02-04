@@ -5,6 +5,8 @@ SET(MAIN_SRCS
         CInotify.hpp
         CWatch.cpp
         CWatch.hpp
+        CParser.cpp
+        CParser.hpp
 )
 
 target_sources(${MAIN_PROJECT} PRIVATE ${MAIN_SRCS})

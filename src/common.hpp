@@ -34,4 +34,36 @@ enum class ErrorCode
     std::array<char, 256> buffer{ 0 };
     return strerror_r(errno, buffer.data(), buffer.size());
 }
+
+template<typename int_t> requires std::integral<int_t>
+[[nodiscard]] std::string previous_date(int_t daysToSubtract)
+{
+    std::chrono::sys_days date = std::chrono::year_month_day{ floor<std::chrono::days>(std::chrono::system_clock::now()) };
+    if(daysToSubtract > 0)
+        date -= std::chrono::days{ daysToSubtract };
+    
+    
+    std::string dateAsStr = std::format("{}", date);
+    std::erase_if(dateAsStr, [](char c){ return c == '-'; });
+    
+    return dateAsStr;
+}
+
+[[nodiscard]] inline std::string todays_date()
+{
+    return previous_date(0);
+}
+
+template<typename path_t> requires std::same_as<std::remove_reference_t<path_t>, std::filesystem::path>
+[[nodiscard]] std::filesystem::path trim_trailing_seperator(path_t&& filepath)
+{
+    if(std::string_view{ filepath.c_str() }.ends_with(std::filesystem::path::preferred_separator))
+    {
+        std::string tmp{ std::forward<path_t>(filepath) };
+        tmp.pop_back();
+        filepath = std::filesystem::path{ std::move(tmp) };
+    }
+    
+    return filepath;
+}
 }   // namespace common
