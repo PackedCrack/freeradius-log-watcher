@@ -8,7 +8,7 @@
 #include <sys/inotify.h>
 
 
-class CWatch final
+class CWatch
 {
 public:
     enum class EventMask : uint32_t

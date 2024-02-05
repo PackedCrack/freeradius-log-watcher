@@ -6,7 +6,7 @@
 #include "CWatch.hpp"
 
 
-class CInotify final
+class CInotify
 {
 public:
     struct EventInfo
@@ -24,8 +24,10 @@ private:
         listening
     };
 private:
+    CInotify();
     explicit CInotify(std::function<void(CInotify& self, const EventInfo& info)>&& eventHandler);
 public:
+    [[nodiscard]] static std::expected<CInotify, common::ErrorCode> make_inotify();
     [[nodiscard]] static std::expected<CInotify, common::ErrorCode> make_inotify(
             std::function<void(CInotify& self, const EventInfo& info)> eventHandler);
     ~CInotify();
@@ -34,6 +36,11 @@ public:
     CInotify& operator=(const CInotify& other);
     CInotify& operator=(CInotify&& other) noexcept;
 public:
+    template<typename handler_t>
+    void update_event_handler(handler_t&& handler)
+    {
+        m_EventHandler = std::forward<handler_t>(handler);
+    }
     template<typename... mask_t> requires (std::is_same_v<std::remove_reference_t<mask_t>, CWatch::EventMask> && ...)
     [[nodiscard]] bool try_add_watch(std::string path, mask_t&&... args)
     {
@@ -61,7 +68,7 @@ public:
         return added;
     }
     [[nodiscard]] std::optional<const CWatch*> find_watch(int32_t watchDescriptor) const;
-    [[nodiscard]] std::optional<std::filesystem::path> watched_filepath(int32_t watchDescriptor) const;
+    [[nodiscard]] std::optional<std::filesystem::path> find_watched_filepath(int32_t watchDescriptor) const;
     [[nodiscard]] bool erase_watch(const std::filesystem::path& path);
     [[nodiscard]] bool start_listening();
     [[nodiscard]] bool stop_listening();

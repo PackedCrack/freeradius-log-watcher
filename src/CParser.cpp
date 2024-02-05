@@ -14,10 +14,13 @@ void CParser::parse_file(std::ifstream& file, std::ifstream::pos_type startPosit
     std::string line{};
     while(std::getline(file, line))
     {
+        std::printf("\n\n\n");
+        
         std::string::size_type headerStart = line.find_first_not_of("\t ");
         std::string::size_type headerEnd = line.find(" = ") - 1;
         if(headerStart != std::string::npos && headerEnd != std::string::npos)
         {
+            // TODO:: handle special headers uniquely..
             if(m_Headers.contains(line.substr(headerStart, headerEnd)))
                 std::printf("\n%s", line.c_str());
         }

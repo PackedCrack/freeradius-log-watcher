@@ -7,6 +7,8 @@ SET(MAIN_SRCS
         CWatch.hpp
         CParser.cpp
         CParser.hpp
+        event_handler.cpp
+        event_handler.hpp
 )
 
 target_sources(${MAIN_PROJECT} PRIVATE ${MAIN_SRCS})

@@ -63,6 +63,18 @@ CInotify::EventInfo make_event_info(const std::array<char, LISTEN_BUFFER_SIZE>& 
 }   // namespace
 
 
+std::expected<CInotify, common::ErrorCode> CInotify::make_inotify()
+{
+    try
+    {
+        return CInotify{};
+    }
+    catch(const std::runtime_error& err)
+    {
+        LOG_ERROR_FMT("{}", err.what());
+        return std::unexpected{ common::ErrorCode::constructorError };
+    }
+}
 std::expected<CInotify, common::ErrorCode> CInotify::make_inotify(
         std::function<void(CInotify& self, const EventInfo& info)> eventHandler)
 {
@@ -76,7 +88,6 @@ std::expected<CInotify, common::ErrorCode> CInotify::make_inotify(
         return std::unexpected{ common::ErrorCode::constructorError };
     }
 }
-
 void CInotify::copy_thread(const CInotify& other)
 {
     if(other.m_CurrentState == State::listening)
@@ -90,7 +101,6 @@ void CInotify::copy_thread(const CInotify& other)
         }
     }
 }
-
 bool CInotify::move_thread(CInotify& other)
 {
     if(other.m_CurrentState == State::listening)
@@ -114,7 +124,6 @@ bool CInotify::move_thread(CInotify& other)
     
     return false;
 }
-
 CInotify CInotify::copy(const CInotify& other) const
 {
     LOG_WARN("Called copy on CInotify.. Is this really what you want?");
@@ -139,13 +148,33 @@ CInotify CInotify::copy(const CInotify& other) const
     
     return cpy;
 }
-
+CInotify::CInotify()
+        : m_FileDescriptor{ inotify_init() }
+          , m_CurrentState{ State::idle }
+          , m_ExitState{ create_tmp_filepath() }
+          , m_ListeningThread{}
+          , m_EventHandler{}
+          , m_Watches{}
+{
+    if(m_FileDescriptor < 0)
+    {
+        throw std::runtime_error{ std::format("Failed to initialize Inotify: {}", common::str_error()) };
+    }
+    
+    // If the /tmp/freerad-log-watcher/ directory doesnt exist we have to create it..
+    std::error_code err{};
+    if(!std::filesystem::exists(TEMP_DIR, err))
+        std::filesystem::create_directory(TEMP_DIR);
+    
+    if(err)
+        throw std::runtime_error{ err.message() };
+}
 CInotify::CInotify(std::function<void(CInotify& self, const EventInfo& info)>&& eventHandler)
     : m_FileDescriptor{ inotify_init() }
     , m_CurrentState{ State::idle }
     , m_ExitState{ create_tmp_filepath() }
     , m_ListeningThread{}
-    , m_EventHandler{ eventHandler }
+    , m_EventHandler{ std::move(eventHandler) }
     , m_Watches{}
 {
     if(m_FileDescriptor < 0)
@@ -161,7 +190,6 @@ CInotify::CInotify(std::function<void(CInotify& self, const EventInfo& info)>&& 
     if(err)
         throw std::runtime_error{ err.message() };
 }
-
 CInotify::~CInotify()
 {
     if(m_FileDescriptor < 0)
@@ -182,7 +210,6 @@ CInotify::~CInotify()
         LOG_ERROR_FMT("Failed to close File Descriptor: {}. Failed with: {}", m_FileDescriptor, common::str_error());
     }
 }
-
 CInotify::CInotify(const CInotify& other)
         : m_FileDescriptor{}
         , m_CurrentState{ }
@@ -194,7 +221,6 @@ CInotify::CInotify(const CInotify& other)
     *this = copy(other);
     copy_thread(other);
 }
-
 CInotify::CInotify(CInotify&& other) noexcept
     : m_FileDescriptor{ other.m_FileDescriptor }
     , m_CurrentState{ State::idle }
@@ -208,7 +234,6 @@ CInotify::CInotify(CInotify&& other) noexcept
     if(!move_thread(other))
         m_ExitState = std::move(other.m_ExitState);
 }
-
 CInotify& CInotify::operator=(const CInotify& other)
 {
     if(this != &other)
@@ -219,7 +244,6 @@ CInotify& CInotify::operator=(const CInotify& other)
     
     return *this;
 }
-
 CInotify& CInotify::operator=(CInotify&& other) noexcept
 {
     if(this != &other)
@@ -236,7 +260,6 @@ CInotify& CInotify::operator=(CInotify&& other) noexcept
     
     return *this;
 }
-
 auto CInotify::listen()
 {
     return [this]()
@@ -278,7 +301,6 @@ auto CInotify::listen()
         }
     };
 }
-
 std::optional<const CWatch*> CInotify::find_watch(int32_t watchDescriptor) const
 {
     auto iter = std::find_if(std::begin(m_Watches), std::end(m_Watches),
@@ -290,13 +312,11 @@ std::optional<const CWatch*> CInotify::find_watch(int32_t watchDescriptor) const
     
     return iter != std::end(m_Watches) ? std::make_optional(&(iter->second)) : std::nullopt;
 }
-
-std::optional<std::filesystem::path> CInotify::watched_filepath(int32_t watchDescriptor) const
+std::optional<std::filesystem::path> CInotify::find_watched_filepath(int32_t watchDescriptor) const
 {
     const CWatch* pWatch = find_watch(watchDescriptor).value_or(nullptr);
     return pWatch != nullptr ? std::make_optional(std::filesystem::path{ pWatch->watching() }) : std::nullopt;
 }
-
 bool CInotify::erase_watch(const std::filesystem::path& path)
 {
     bool erased = false;
@@ -305,7 +325,6 @@ bool CInotify::erase_watch(const std::filesystem::path& path)
     
     return erased;
 }
-
 bool CInotify::start_listening()
 {
     ASSERT(m_CurrentState == State::idle, "This notify is already listening to events!");
@@ -343,7 +362,6 @@ bool CInotify::start_listening()
     
     return true;
 }
-
 bool CInotify::stop_listening()
 {
     ASSERT(m_CurrentState == State::listening, "This notify is not listening to events!");
@@ -378,7 +396,6 @@ bool CInotify::stop_listening()
     
     return true;
 }
-
 bool CInotify::has_watch(const std::filesystem::path& path)
 {
     return m_Watches.contains(path);
