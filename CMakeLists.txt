@@ -14,7 +14,7 @@ include(cmake/cppcheck.cmake)
 
 
 add_executable(${MAIN_PROJECT})
-#add_dependencies(${MAIN_PROJECT} CPPCHECK)
+add_dependencies(${MAIN_PROJECT} CPPCHECK)
 add_subdirectory("src")
 # properties
 set_target_properties(${MAIN_PROJECT} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${OUTPUT_DIRECTORY}")
@@ -22,6 +22,8 @@ set_target_properties(${MAIN_PROJECT} PROPERTIES CXX_STANDARD 23)
 set_target_properties(${MAIN_PROJECT} PROPERTIES C_STANDARD 11)
 set_target_properties(${MAIN_PROJECT} PROPERTIES CXX_STANDARD_REQUIRED ON)
 set_target_properties(${MAIN_PROJECT} PROPERTIES C_STANDARD_REQUIRED ON)
+# include dirs
+target_include_directories(${MAIN_PROJECT} PRIVATE "${PROJECT_SOURCE_DIR}/external/include")
 # compiler settings etc
 apply_compiler_warnings(${MAIN_PROJECT})
 use_pch(${MAIN_PROJECT})

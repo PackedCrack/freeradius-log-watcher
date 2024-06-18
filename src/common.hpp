@@ -51,7 +51,8 @@ template<typename int_t> requires std::integral<int_t>
 
 [[nodiscard]] inline std::string todays_date()
 {
-    return previous_date(0);
+    static constexpr int32_t DAYS_TO_SUBTRACT = 0;
+    return previous_date(DAYS_TO_SUBTRACT);
 }
 
 template<typename path_t> requires std::same_as<std::remove_reference_t<path_t>, std::filesystem::path>
