@@ -4,10 +4,11 @@
 
 namespace
 {
-constexpr std::string_view KEY_RADACCT = "radacct";
+constexpr std::string_view KEY_RADACCT = "-radacct";
+constexpr std::string_view KEY_RADIUS = "-radius";
 
 
-[[nodiscard]] std::vector<std::filesystem::path> watch_log_files(
+[[nodiscard]] std::vector<std::filesystem::path> watch_accounting_log_files(
         CInotify& fileSystemMonitor,
         const std::vector<std::filesystem::directory_iterator>& watchedDirs)
 {
@@ -46,7 +47,7 @@ constexpr std::string_view KEY_RADACCT = "radacct";
     
     return watchedFiles;
 }
-[[nodiscard]] std::vector<std::filesystem::directory_iterator> watch_log_directories(
+[[nodiscard]] std::vector<std::filesystem::directory_iterator> watch_accounting_directories(
         CInotify& fileSystemMonitor,
         const std::filesystem::path& logDirectory)
 {
@@ -110,7 +111,7 @@ constexpr std::string_view KEY_RADACCT = "radacct";
     }
     else if(!std::filesystem::is_directory(path, err))
     {
-        LOG_ERROR_FMT("Log directory: \"{}\" does is not a directory..", path.c_str());
+        LOG_ERROR_FMT("Log directory: \"{}\" is not a directory..", path.c_str());
         valid = false;
     }
     else if(err)
@@ -121,28 +122,74 @@ constexpr std::string_view KEY_RADACCT = "radacct";
     
     return valid;
 }
-[[nodiscard]] std::filesystem::path make_log_directory_path(const std::unordered_map<std::string_view, std::string>& argCache)
+[[nodiscard]] std::filesystem::path validate(std::filesystem::path logDirectory)
 {
-    std::filesystem::path logDirectory{};
-    if(argCache.contains(KEY_RADACCT))
-        logDirectory = argCache.find(KEY_RADACCT)->second;
-    else
-        logDirectory = "/var/log/freeradius/radacct";
-    
-    
     if(!validate_log_directory(logDirectory))
     {
         LOG_FATAL_FMT("Failed to validate log directory: \"{}\"", logDirectory.c_str());
     }
     
-    return logDirectory;
+    return common::trim_trailing_seperator(logDirectory);
+}
+[[nodiscard]] std::filesystem::path make_accounting_directory_path(const std::unordered_map<std::string_view, std::string>& argCache)
+{
+    if(argCache.contains(KEY_RADACCT))
+    {
+        return validate(argCache.find(KEY_RADACCT)->second);
+    }
+    else
+    {
+        return validate("/var/log/freeradius/radacct");
+    }
+}
+[[nodiscard]] std::filesystem::path make_radius_log_directory_path(const std::unordered_map<std::string_view, std::string>& argCache)
+{
+    if(argCache.contains(KEY_RADIUS))
+    {
+        return validate(argCache.find(KEY_RADIUS)->second);
+    }
+    else
+    {
+        return validate("/var/log/freeradius");
+    }
+}
+[[nodiscard]] std::vector<std::filesystem::path> watch_radius_log_file(
+        const std::unordered_map<std::string_view, std::string>& argCache,
+        CInotify& fileSystemMonitor,
+        std::vector<std::filesystem::path>& watchedFiles)
+{
+    std::filesystem::path directory = make_radius_log_directory_path(argCache);
+    
+    std::filesystem::path radiusLog = directory / "radius.log";
+    std::error_code err{};
+    if(std::filesystem::is_regular_file(radiusLog, err))
+    {
+        if(fileSystemMonitor.try_add_watch(radiusLog, CWatch::EventMask::inModify))
+        {
+            LOG_INFO_FMT("Created a modification watch for file: \"{}\".", radiusLog.c_str());
+            watchedFiles.emplace_back(radiusLog);
+        }
+        else
+        {
+            LOG_ERROR_FMT("Failed to create watch for entry: \"{}\" when looking for the latest log file",
+                          radiusLog.c_str());
+        }
+    }
+    else if(err)
+    {
+        LOG_ERROR_FMT("Failed to find 'radius.log' in directory: \"{}\". Error message: \"{}\"",
+                      radiusLog.c_str(),
+                      err.message());
+    }
+    
+    return watchedFiles;
 }
 void process_cmd_line_args(int argc, char** argv, std::unordered_map<std::string_view, std::string>& argCache)
 {
     for (int32_t i = 0; i < argc; ++i)
     {
         std::string_view arg = argv[i];
-        if(arg == "-radacct")
+        if(arg == KEY_RADACCT)
         {
             i = i + 1;
             
@@ -155,6 +202,21 @@ void process_cmd_line_args(int argc, char** argv, std::unordered_map<std::string
             else
             {
                 LOG_WARN("Failed to add custom radacct directory to the argument cache..");
+            }
+        }
+        else if (arg == KEY_RADIUS)
+        {
+            i = i + 1;
+            
+            std::filesystem::path customDir = common::trim_trailing_seperator(std::filesystem::path{ argv[i] });
+            auto[iter, emplaced] = argCache.try_emplace(KEY_RADIUS, customDir.c_str());
+            if(emplaced)
+            {
+                LOG_INFO_FMT("Using custom filepath to radius log directory: \"{}\"", iter->second);
+            }
+            else
+            {
+                LOG_WARN("Failed to add custom radius log directory to the argument cache..");
             }
         }
     }
@@ -174,8 +236,9 @@ int main(int argc, char** argv)
         
         CInotify fileSystemMonitor = make_filesystem_monitor();
         std::vector<std::filesystem::directory_iterator> watchedDirs =
-                watch_log_directories(fileSystemMonitor, make_log_directory_path(argCache));
-        std::vector<std::filesystem::path> watchedFiles = watch_log_files(fileSystemMonitor, watchedDirs);
+                watch_accounting_directories(fileSystemMonitor, make_accounting_directory_path(argCache));
+        std::vector<std::filesystem::path> watchedFiles = watch_accounting_log_files(fileSystemMonitor, watchedDirs);
+        watchedFiles = watch_radius_log_file(argCache, fileSystemMonitor, watchedFiles);
         
         fileSystemMonitor.update_event_handler(make_event_handler(watchedFiles));
         
@@ -184,7 +247,9 @@ int main(int argc, char** argv)
         
         // TODO: provide proper exit method so it can be gracefully exited and not just with CTRL - C
         while (true)
-        {}
+        {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
 
         return EXIT_SUCCESS;
     }

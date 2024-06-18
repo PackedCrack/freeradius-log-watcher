@@ -11,7 +11,8 @@ class CParser
 {
     friend CParserBuilder;
 public:
-    void parse_file(std::ifstream& file, std::ifstream::pos_type startPosition = 0) const;
+    void parse_accounting_log(std::ifstream& file, std::ifstream::pos_type startPosition = 0) const;
+    void parse_radius_log(std::ifstream& file, std::ifstream::pos_type startPosition = 0) const;
 private:
     std::unordered_set<std::string> m_Headers;
 };

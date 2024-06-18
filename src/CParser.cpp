@@ -43,7 +43,7 @@ void handle_acct_type_str(std::string_view acctType)
 //    std::printf("\n \033[0m");
 //}
 }
-void CParser::parse_file(std::ifstream& file, std::ifstream::pos_type startPosition) const
+void CParser::parse_accounting_log(std::ifstream& file, std::ifstream::pos_type startPosition) const
 {
     ASSERT(file.is_open(), "File parameter can't be parsed since its not opened!");
     
@@ -71,5 +71,32 @@ void CParser::parse_file(std::ifstream& file, std::ifstream::pos_type startPosit
                 std::printf("\n%s", as_formatted_view(line).data());
             }
         }
+    }
+}
+void CParser::parse_radius_log(std::ifstream& file, std::ifstream::pos_type startPosition) const
+{
+    ASSERT(file.is_open(), "File parameter can't be parsed since its not opened!");
+    
+    file.seekg(startPosition);
+    
+    std::printf("\n");
+    
+    std::string line{};
+    while(std::getline(file, line))
+    {
+        if (line.contains("Login OK"))
+        {
+            green_text();
+        }
+        else if (line.contains("Login incorrect"))
+        {
+            red_text();
+        }
+        else if (line.contains("ERROR"))
+        {
+            red_text();
+        }
+        
+        std::printf("\n%s", line.c_str());
     }
 }

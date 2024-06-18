@@ -116,7 +116,7 @@ void parse_created_log(
                     "Failed to cache file position after reading newly created file: \"{}\"", newLog.c_str());
         }
         
-        parser.parse_file(file);
+        parser.parse_accounting_log(file);
     }
     else
     {
@@ -148,7 +148,15 @@ void parse_created_log(
             
             // Parse file
             std::ifstream::pos_type position = iter->second;
-            parser.parse_file(file, position);
+            
+            if(std::string_view{ modifiedLog.c_str() }.contains("radius.log"))
+            {
+                parser.parse_radius_log(file, position);
+            }
+            else
+            {
+                parser.parse_accounting_log(file, position);
+            }
             
             // Update cached fileseeker value with active fileseeker's value
             iter->second = fileSize;
@@ -233,7 +241,7 @@ void parse_created_log(
 std::function<void(CInotify& self, const CInotify::EventInfo& info)> make_event_handler(
         const std::vector<std::filesystem::path>& watchedFiles)
 {
-    return[prevFilePositions = make_file_pos_cache(watchedFiles),parser = make_parser()](
+    return[prevFilePositions = make_file_pos_cache(watchedFiles), parser = make_parser()](
             auto&& self, const CInotify::EventInfo& info) mutable
     {
         if(info.mask & CWatch::EventMask::inCreate)
