@@ -11,10 +11,15 @@ class CInotify
 public:
     struct EventInfo
     {
+        // cppcheck-suppress [unusedStructMember]
         int32_t wd;
+        // cppcheck-suppress [unusedStructMember]
         CWatch::EventMask mask;
+        // cppcheck-suppress [unusedStructMember]
         uint32_t cookie;
+        // cppcheck-suppress [unusedStructMember]
         uint32_t len;
+        // cppcheck-suppress [unusedStructMember]
         std::string name;
     };
 private:

@@ -145,7 +145,9 @@ void process_cmd_line_args(int argc, char** argv, std::unordered_map<std::string
         if(arg == "-radacct")
         {
             i = i + 1;
-            auto[iter, emplaced] = argCache.try_emplace(KEY_RADACCT, std::string{ argv[i] });
+            
+            std::filesystem::path customDir = common::trim_trailing_seperator(std::filesystem::path{ argv[i] });
+            auto[iter, emplaced] = argCache.try_emplace(KEY_RADACCT, customDir.c_str());
             if(emplaced)
             {
                 LOG_INFO_FMT("Using custom filepath to radacct directory: \"{}\"", iter->second);
@@ -180,11 +182,9 @@ int main(int argc, char** argv)
         
         [[maybe_unused]] bool result = fileSystemMonitor.start_listening();
         
-        bool exit = false;
-        while (!exit)
-        {
-        
-        }
+        // TODO: provide proper exit method so it can be gracefully exited and not just with CTRL - C
+        while (true)
+        {}
 
         return EXIT_SUCCESS;
     }

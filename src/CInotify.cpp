@@ -17,7 +17,6 @@ constexpr std::string_view TEMP_FILE_NAME = "/tmp/freerad-log-watcher/thread-sta
 
 CInotify::EventInfo make_event_info(const std::array<char, LISTEN_BUFFER_SIZE>& buffer, size_t offset)
 {
-    // Make sure the first values are trivially constructable
     static_assert(std::is_trivially_copy_constructible_v<decltype(CInotify::EventInfo::wd)>);
     static_assert(std::is_trivially_copy_constructible_v<decltype(CInotify::EventInfo::mask)>);
     static_assert(std::is_trivially_copy_constructible_v<decltype(CInotify::EventInfo::cookie)>);
@@ -28,23 +27,26 @@ CInotify::EventInfo make_event_info(const std::array<char, LISTEN_BUFFER_SIZE>& 
              sizeof(decltype(CInotify::EventInfo::mask)) +
              sizeof(decltype(CInotify::EventInfo::cookie)) +
              sizeof(decltype(CInotify::EventInfo::len)))
-            == EVENT_SIZE
-            && (sizeof(CInotify::EventInfo) - sizeof(std::string)) == EVENT_SIZE);
-    // Finally make sure that the trivially cosntructable members are actually before our non trivial member
-    static_assert(offsetof(CInotify::EventInfo, wd) < offsetof(CInotify::EventInfo, name));
-    static_assert(offsetof(CInotify::EventInfo, mask) < offsetof(CInotify::EventInfo, name));
-    static_assert(offsetof(CInotify::EventInfo, cookie) < offsetof(CInotify::EventInfo, name));
-    static_assert(offsetof(CInotify::EventInfo, len) < offsetof(CInotify::EventInfo, name));
+            == EVENT_SIZE);
     
-    CInotify::EventInfo event{};
-    // Pretty sure clang-tidy is wrong.. ¯\_(ツ)_/¯
-    IGNORE_WARNING(std::memcpy(&event, &buffer[offset], EVENT_SIZE), "-Wclass-memaccess");
-    event.name = std::string{ &buffer[offset + EVENT_SIZE], event.len };
+    // The EventInfo struct is not trivially constructable since it contains a std::string..
+    // But the trivial members are all the same size (32bit) so initialize them in a new array and direct assign them
+    std::array<uint32_t, 4> trivialMembers{};
+    static_assert(trivialMembers.size() <= EVENT_SIZE);
+    std::memcpy(trivialMembers.data(), &buffer[offset], EVENT_SIZE);
+    
+    ASSERT(trivialMembers[0] <= INT32_MAX, "Unsigned/signed cast overflow");
+    CInotify::EventInfo event{
+            .wd = static_cast<int32_t>(trivialMembers[0]),
+            .mask = CWatch::EventMask{ trivialMembers[1] },
+            .cookie = trivialMembers[2],
+            .len = trivialMembers[3],
+            .name = std::string{ &buffer[offset + EVENT_SIZE], event.len }
+    };
     
     // Remove any potential null terminators that the constructor may have put in the string content - it screws up logging
     while(event.name.ends_with(static_cast<char>(0)))
         event.name.pop_back();
-    
     
     return event;
 }
@@ -354,9 +356,7 @@ bool CInotify::start_listening()
     }
     catch(const std::system_error& err)
     {
-        if(watchAdded)
-            m_Watches.erase(m_ExitState);
-        
+        m_Watches.erase(m_ExitState);
         LOG_ERROR_FMT("Failed to start listening thread! Message: {}", err.what());
     }
     

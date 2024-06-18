@@ -44,8 +44,8 @@ public:
     [[nodiscard]] inline CParserBuilder& acct_output_packets(){ m_Parser.m_Headers.emplace("Acct-Output-Packets"); return *this; }
     [[nodiscard]] inline CParserBuilder& acct_input_octets(){ m_Parser.m_Headers.emplace("Acct-Input-Octets"); return *this; }
     [[nodiscard]] inline CParserBuilder& acct_input_gigawords(){ m_Parser.m_Headers.emplace("Acct-Input-Gigawords"); return *this; }
-    [[nodiscard]] inline CParserBuilder& acct_outputput_octets(){ m_Parser.m_Headers.emplace("Acct-Output-Octets"); return *this; }
-    [[nodiscard]] inline CParserBuilder& acct_outputput_gigawords(){ m_Parser.m_Headers.emplace("Acct-Output-Gigawords"); return *this; }
+    [[nodiscard]] inline CParserBuilder& acct_output_octets(){ m_Parser.m_Headers.emplace("Acct-Output-Octets"); return *this; }
+    [[nodiscard]] inline CParserBuilder& acct_output_gigawords(){ m_Parser.m_Headers.emplace("Acct-Output-Gigawords"); return *this; }
     [[nodiscard]] inline CParserBuilder& acct_terminate_cause(){ m_Parser.m_Headers.emplace("Acct-Terminate-Cause"); return *this; }
     [[nodiscard]] inline CParserBuilder& acct_unique_session_id(){ m_Parser.m_Headers.emplace("Acct-Unique-Session-Id"); return *this; }
     [[nodiscard]] inline CParserBuilder& timestamp(){ m_Parser.m_Headers.emplace("Timestamp"); return *this; }

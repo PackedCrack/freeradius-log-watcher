@@ -25,8 +25,4 @@ https://en.cppreference.com/w/cpp/compiler_support/23
 #### Compile and Link
 ninja
 
-## Removing Cppcheck as build dependency
-Cppcheck can be removed as a custom build target in case it causes troubles (It doesnt play well with CMake's PCH..).
-* open root/src/CMakeLists.txt
-* Remove line 5 - "add_dependencies(${MAIN_PROJECT} cppcheck)"
 
